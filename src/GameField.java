@@ -13,8 +13,16 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
 
+class ImageLoader
+{
+    public static Image LoadImage(String path)
+    {
+        ImageIcon icon = new ImageIcon(path);
+        Image image = icon.getImage();
 
-
+        return image;
+    }
+}
 
 class Vector
 {
@@ -28,9 +36,29 @@ class Vector
     }
 }
 
+class Pickup
+{
+    public Vector position;
+    public Image image;
+    public boolean exists = false;
+
+    public Pickup()
+    {
+        position = new Vector();
+        image = null;
+    }
+}
+
+class Flash extends Pickup
+{
+    public Flash()
+    {
+        super();
+        image = ImageLoader.LoadImage("flash.png");
+    }
+}
+
 public class GameField extends JPanel implements ActionListener {
-
-
     private final int SIZE = 20;
     private final int DOT_SIZE = 16;
     private final int ALL_DOTS = 400;
@@ -40,9 +68,8 @@ public class GameField extends JPanel implements ActionListener {
     private Image barrier;
     private Image background;
     private Image stas;
-    private Image flash;
-    private int flashX;
-    private int flashY;
+
+    private Flash flash = new Flash();
 
     int counter = 0;
 
@@ -71,6 +98,14 @@ public class GameField extends JPanel implements ActionListener {
     //желаемое положение змейки
     private int desiredDirection = RIGHT;
 
+    final int REGULAR_DELAY = 200;
+    final int FLASH_DELAY = 100;
+    //сколько действие флешки в секундах
+    final int FLASH_TIME = 10;
+
+    protected int flashCountdown = 0;
+    protected boolean isFlashed = false;
+
 
     private Clip backgroundMusic;
     private Clip gameOverSound;
@@ -89,29 +124,36 @@ public class GameField extends JPanel implements ActionListener {
         gettingFlashSound = initializeSound("flash.wav");
     }
 
-
-    public void initGame(){ //инициализация игры
+    //инициализация игры
+    public void initGame(){
         dots = 3;
         counter = 0;
         int startX = 3;
         int startY = 3;
         for(int i=0; i<dots; i++){
-            x[i] = 3;
-            y[i] = 3;
+            x[i] = startX;
+            y[i] = startY;
         }
-        //new Timer(250, this);
         if (timer != null) {
             timer.stop();
         }
-        timer = new Timer(200, this);
+        timer = new Timer(this.REGULAR_DELAY, this);
+        timer.setInitialDelay(1);
         timer.start();
         createApple();
-//        createFlash();
+        //createFlash();
         createBarrier();
         inGame = true;
         direction = RIGHT;
         desiredDirection = RIGHT;
+        isFlashed = false;
+        flashCountdown = 0;
         barriers.clear();
+
+        if (gameOverSound != null) {
+            gameOverSound.stop();
+            gameOverSound.setFramePosition(0);
+        }
     }
 
     public void createApple(){
@@ -121,7 +163,7 @@ public class GameField extends JPanel implements ActionListener {
         do {
             appleX = random.nextInt(SIZE);
             appleY = random.nextInt(SIZE);
-            System.out.println("Apple generated: " + appleX + " " + appleY + " - it is generation " + iterations);
+            //System.out.println("Apple generated: " + appleX + " " + appleY + " - it is generation " + iterations);
 
             for (Vector ass: barriers) {
                 if ((appleX == barrier.x) && (appleY == barrier.y)) {
@@ -149,9 +191,10 @@ public class GameField extends JPanel implements ActionListener {
         }
     }
 
-    public void  createFlash(){
-        flashX = random.nextInt(SIZE);
-        flashY = random.nextInt(SIZE);
+    public void createFlash(){
+        flash.position.x = random.nextInt(SIZE);
+        flash.position.y = random.nextInt(SIZE);
+        flash.exists = true;
     }
 
     public void createBarrier(){
@@ -163,7 +206,7 @@ public class GameField extends JPanel implements ActionListener {
         do {
             barrier.x = random.nextInt(20);
             barrier.y = random.nextInt(20);
-            System.out.println("Barrier generated: " + barrier.x + " " + barrier.y + " - it is generation " + iterations);
+            //System.out.println("Barrier generated: " + barrier.x + " " + barrier.y + " - it is generation " + iterations);
 
             if ((Math.abs(barrier.y - y[0]) < width) && (Math.abs(barrier.x - x[0]) < width)) {
                 isPositionOkay = false;
@@ -279,9 +322,6 @@ public class GameField extends JPanel implements ActionListener {
         ImageIcon iconApple = new ImageIcon("apple.png");
         apple = iconApple.getImage();
 
-        ImageIcon iconFlash = new ImageIcon("flash.png");
-        flash = iconFlash.getImage();
-
         ImageIcon iconBarrier = new ImageIcon("barrier.png");
         barrier = iconBarrier.getImage();
 
@@ -305,6 +345,7 @@ public class GameField extends JPanel implements ActionListener {
         super.paintComponent(g);
 
         String SCORE = String.valueOf(counter);
+        long kek = java.lang.System.currentTimeMillis();
 
         if (inGame) {
             g.drawImage(background, 0, 0, this);
@@ -312,25 +353,33 @@ public class GameField extends JPanel implements ActionListener {
 
             int shift = 50;
             int fieldRectSize = 336;
+            //мигание
+            if (flashCountdown > 0) {
+                float colorPart = (float)((Math.sin(kek * 0.01) + 1) * 0.5);
+                this.setBackground(new Color(colorPart, colorPart, colorPart));
+            } else {
+                this.setBackground(Color.white);
+            }
             g.fillRect(0 + shift, 0 + shift, fieldRectSize, fieldRectSize);
             g.drawImage(apple, appleX * DOT_SIZE + shift, appleY * DOT_SIZE + shift, this);
-            g.drawImage(flash, flashX * DOT_SIZE + shift, flashY * DOT_SIZE + shift, this);
             for (Vector ass: barriers) {
                 g.drawImage(barrier, ass.x * DOT_SIZE + shift, ass.y * DOT_SIZE + shift, this);
             }
 
             g.drawString("Очки: " + SCORE, 460, 110);
 
-
-
-
             for (int i = 1; i < dots; i++) {
                 g.drawImage(dot, x[i] * DOT_SIZE + shift, y[i] * DOT_SIZE + shift, this);
             }
             g.drawImage(head, x[0] * DOT_SIZE + shift, y[0] * DOT_SIZE + shift, this);
 
+            if (flash.exists) {
+                g.drawImage(flash.image, flash.position.x * DOT_SIZE + shift, flash.position.y * DOT_SIZE + shift, this);
+            }
         } else {
+            this.setBackground(Color.white);
             timer.setDelay(1);
+            timer.restart();
             String str = "Game over";
             g.setColor(Color.BLACK);
             g.drawString(str, 125, SIZE / 2);
@@ -339,7 +388,6 @@ public class GameField extends JPanel implements ActionListener {
 
             Graphics2D g2 = (Graphics2D)g;
 
-            long kek = java.lang.System.currentTimeMillis();
             double rotation = Math.sin(kek * 0.001) * 0.5;
 
             int stasX = 380;
@@ -377,8 +425,10 @@ public class GameField extends JPanel implements ActionListener {
 
     public void checkApple() {
         if (x[0] == appleX && y[0] == appleY) {
-            dots++;
-            counter++;
+            int reward = flashCountdown > 0 ? 3 : 1;
+
+            dots += reward;
+            counter += reward;
             createApple();
             createBarrier();
             if(dots == 10 || dots == 15 || dots == 25) {
@@ -389,12 +439,27 @@ public class GameField extends JPanel implements ActionListener {
     }
 
 
-    public void checkFlash(){
-        if(x[0]==flashX && y[0] == flashY){
-            timer = new Timer(100, this);
+    public void checkFlash() {
+        if (flash.exists && ((x[0] == flash.position.x) && (y[0] == flash.position.y))){
+            timer.stop();
+            timer.setDelay(this.FLASH_DELAY);
             timer.start();
+            flash.exists = false;
 
+            flashCountdown = this.FLASH_TIME * (1000 / this.FLASH_DELAY);
+            if (gettingFlashSound != null && !gettingFlashSound.isRunning()) {
+                gettingFlashSound.setFramePosition(0);
+                gettingFlashSound.start();
+            }
+        }
 
+        if (flashCountdown > 0) {
+            flashCountdown--;
+        } else {
+            flashCountdown = 0;
+            if (timer.getDelay() != this.REGULAR_DELAY) {
+                timer.setDelay(this.REGULAR_DELAY);
+            }
         }
     }
 
@@ -439,13 +504,8 @@ public class GameField extends JPanel implements ActionListener {
             if (x[0] == appleX && y[0] == appleY) {
                 gettingAppleSound.setFramePosition(0);
                 gettingAppleSound.start();
-            }}
-
-        if (gettingFlashSound != null && !gettingFlashSound.isRunning()) {
-            if (x[0] == flashX && y[0] == flashY) {
-                gettingFlashSound.setFramePosition(0);
-                gettingFlashSound.start();
-            }}
+            }
+        }
     }
 
 
@@ -460,8 +520,6 @@ public class GameField extends JPanel implements ActionListener {
             if ((backgroundMusic != null) && (!backgroundMusic.isRunning())) {
                 backgroundMusic.setFramePosition(0);
                 backgroundMusic.start();
-
-
             }
         } else {
             backgroundMusic.stop();
@@ -509,16 +567,12 @@ public class GameField extends JPanel implements ActionListener {
         Clip clip = null;
         try{
             File musicFile = new File(filepath);
-            System.out.println(musicFile.exists() ? "FILE EXISTS" : "FILE NOT EXISTS");
             music = AudioSystem.getAudioInputStream(musicFile);
+            music.getFormat();
 
             clip = AudioSystem.getClip();
 
             clip.open(music);
-
-
-            //AudioStream audios = new AudioStream(music);
-            //AudioPlayer.player.start(audios);
         } catch (IOException e) {
             e.printStackTrace();
         } catch (UnsupportedAudioFileException e) {
