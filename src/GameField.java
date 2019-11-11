@@ -40,6 +40,9 @@ public class GameField extends JPanel implements ActionListener {
     private Image barrier;
     private Image background;
     private Image stas;
+    private Image flash;
+    private int flashX;
+    private int flashY;
 
     int counter = 0;
 
@@ -69,13 +72,21 @@ public class GameField extends JPanel implements ActionListener {
     private int desiredDirection = RIGHT;
 
 
+    private Clip backgroundMusic;
+    private Clip gameOverSound;
+    private Clip gettingAppleSound;
+    private Clip gettingFlashSound;
+
     public GameField() {
         setBackground(Color.white);
         loadImages();
         initGame();
         addKeyListener(new FieldKeyListener());
         setFocusable(true); //фокус на игровом поле
-
+        gameOverSound = initializeSound("GameOver.wav");
+        backgroundMusic = initializeSound("fon.wav");
+        gettingAppleSound = initializeSound("glotok.wav");
+        gettingFlashSound = initializeSound("flash.wav");
     }
 
 
@@ -95,6 +106,7 @@ public class GameField extends JPanel implements ActionListener {
         timer = new Timer(200, this);
         timer.start();
         createApple();
+//        createFlash();
         createBarrier();
         inGame = true;
         direction = RIGHT;
@@ -137,6 +149,10 @@ public class GameField extends JPanel implements ActionListener {
         }
     }
 
+    public void  createFlash(){
+        flashX = random.nextInt(SIZE);
+        flashY = random.nextInt(SIZE);
+    }
 
     public void createBarrier(){
         Vector barrier = new Vector();
@@ -263,6 +279,9 @@ public class GameField extends JPanel implements ActionListener {
         ImageIcon iconApple = new ImageIcon("apple.png");
         apple = iconApple.getImage();
 
+        ImageIcon iconFlash = new ImageIcon("flash.png");
+        flash = iconFlash.getImage();
+
         ImageIcon iconBarrier = new ImageIcon("barrier.png");
         barrier = iconBarrier.getImage();
 
@@ -295,6 +314,7 @@ public class GameField extends JPanel implements ActionListener {
             int fieldRectSize = 336;
             g.fillRect(0 + shift, 0 + shift, fieldRectSize, fieldRectSize);
             g.drawImage(apple, appleX * DOT_SIZE + shift, appleY * DOT_SIZE + shift, this);
+            g.drawImage(flash, flashX * DOT_SIZE + shift, flashY * DOT_SIZE + shift, this);
             for (Vector ass: barriers) {
                 g.drawImage(barrier, ass.x * DOT_SIZE + shift, ass.y * DOT_SIZE + shift, this);
             }
@@ -355,16 +375,28 @@ public class GameField extends JPanel implements ActionListener {
         direction = desiredDirection;
     }
 
-    public void checkApple(){
-        if(x[0]==appleX && y[0] == appleY){
+    public void checkApple() {
+        if (x[0] == appleX && y[0] == appleY) {
             dots++;
             counter++;
             createApple();
             createBarrier();
+            if(dots == 10 || dots == 15 || dots == 25) {
+                createFlash();
+            }
+
         }
     }
 
 
+    public void checkFlash(){
+        if(x[0]==flashX && y[0] == flashY){
+            timer = new Timer(100, this);
+            timer.start();
+
+
+        }
+    }
 
 
     //препятствие в виде стены
@@ -393,6 +425,27 @@ public class GameField extends JPanel implements ActionListener {
         } else if(y[0] < 0) {
             inGame = false;
         }
+
+        if (inGame == false) {
+
+            if (gameOverSound != null) {
+                gameOverSound.setFramePosition(0);
+                gameOverSound.start();
+            }
+        }
+
+
+        if (gettingAppleSound != null && !gettingAppleSound.isRunning()) {
+            if (x[0] == appleX && y[0] == appleY) {
+                gettingAppleSound.setFramePosition(0);
+                gettingAppleSound.start();
+            }}
+
+        if (gettingFlashSound != null && !gettingFlashSound.isRunning()) {
+            if (x[0] == flashX && y[0] == flashY) {
+                gettingFlashSound.setFramePosition(0);
+                gettingFlashSound.start();
+            }}
     }
 
 
@@ -401,9 +454,17 @@ public class GameField extends JPanel implements ActionListener {
     public void actionPerformed(ActionEvent e) {
         if(inGame){
             checkApple(); //встретили яблоко
+            checkFlash();
             move();
             checkCollisions();
+            if ((backgroundMusic != null) && (!backgroundMusic.isRunning())) {
+                backgroundMusic.setFramePosition(0);
+                backgroundMusic.start();
 
+
+            }
+        } else {
+            backgroundMusic.stop();
         }
         repaint();
     }
@@ -443,20 +504,17 @@ public class GameField extends JPanel implements ActionListener {
         }
     }
 
-    public static void playMusic(String filepath){
+    public Clip initializeSound(String filepath){
         AudioInputStream music;
-
+        Clip clip = null;
         try{
             File musicFile = new File(filepath);
             System.out.println(musicFile.exists() ? "FILE EXISTS" : "FILE NOT EXISTS");
             music = AudioSystem.getAudioInputStream(musicFile);
 
-            Clip clip = AudioSystem.getClip();
+            clip = AudioSystem.getClip();
 
             clip.open(music);
-
-            clip.setFramePosition(0);
-            clip.start();
 
 
             //AudioStream audios = new AudioStream(music);
@@ -468,15 +526,8 @@ public class GameField extends JPanel implements ActionListener {
         } catch (LineUnavailableException e) {
             e.printStackTrace();
         }
-    }
 
-
-        public static void main(String[] args) {
-        MainWindow mw = new MainWindow();
-
-      playMusic("fon.wav");
-
-
+        return clip;
     }
 }
 

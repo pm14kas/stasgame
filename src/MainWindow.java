@@ -20,19 +20,16 @@ public class MainWindow extends JFrame {
     }
 
     public static void main(String[] args) {
+        MainWindow mw = new MainWindow();
+
+     //  playMusic("fon.wav");
+
+
+
+       //playMusic("GameOver.wav");
+
 
     }
-//    public static void main(String[] args) {
-//        MainWindow mw = new MainWindow();
-//
-//       playMusic("fon.wav");
-//
-//
-//
-//       //playMusic("GameOver.wav");
-//
-//
-//    }
 
 
 
